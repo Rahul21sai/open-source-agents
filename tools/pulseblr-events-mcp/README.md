@@ -1,4 +1,4 @@
-# PulseBLR Events MCP
+# PulseBLR Event Planner
 
 > Discover Bengaluru developer events, infer relevant organiser communities, and plan a feasible itinerary through five model-independent MCP tools. The server is key-free; an optional Gemini chat client is included for manual testing.
 

@@ -1,4 +1,4 @@
-# PulseBLR Events MCP: two-minute review
+# PulseBLR Event Planner: two-minute review
 
 Run commands from `tools/pulseblr-events-mcp`, the directory containing `pyproject.toml`. No push is required.
 

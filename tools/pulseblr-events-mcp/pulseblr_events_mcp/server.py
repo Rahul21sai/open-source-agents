@@ -26,7 +26,7 @@ def create_server(source, now=None):
 
     server = MCPServer(
         "pulseblr-events",
-        title="PulseBLR Events MCP",
+        title="PulseBLR Event Planner",
         version="0.1.0",
         instructions=(
             "Five read-only capabilities for Bengaluru engineering events: search, details, "
