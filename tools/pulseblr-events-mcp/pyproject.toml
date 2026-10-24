@@ -14,6 +14,10 @@ dependencies = ["mcp==2.3.0", "tzdata==2026.5", "anyio==4.15.1", "httpx2==2.16.0
 
 [project.scripts]
 pulseblr-events-mcp = "pulseblr_events_mcp.__main__:main"
+pulseblr-events-gemini = "pulseblr_events_mcp.gemini_client:main"
+
+[project.optional-dependencies]
+gemini = ["google-genai==2.33.0", "httpx==0.28.1"]
 
 [project.urls]
 Repository = "https://github.com/gdgcblr/open-source-agents"
@@ -31,7 +35,7 @@ dev = [
 packages = ["pulseblr_events_mcp"]
 
 [tool.hatch.build.targets.sdist]
-include = ["pulseblr_events_mcp/", "tests/", "scripts/", "README.md", "LICENSE", "pyproject.toml", "requirements.lock", "requirements-dev.lock", "uv.lock", ".env.example", ".gitignore"]
+include = ["pulseblr_events_mcp/", "tests/", "scripts/", "docs/", "README.md", "LICENSE", "pyproject.toml", "requirements.lock", "requirements-dev.lock", "requirements-gemini.lock", "uv.lock", ".env.example", ".gitignore"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

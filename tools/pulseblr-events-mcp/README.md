@@ -1,6 +1,6 @@
 # PulseBLR Events MCP
 
-> Discover Bengaluru developer events, infer relevant organiser communities, and plan a feasible itinerary through five MCP tools—without an API key.
+> Discover Bengaluru developer events, infer relevant organiser communities, and plan a feasible itinerary through five model-independent MCP tools. The server is key-free; an optional Gemini chat client is included for manual testing.
 
 ## Overview
 
@@ -22,10 +22,10 @@ This tool is for developers and MCP-host builders. It connects a local assistant
 
 - **Language & runtime:** Python 3.11 or newer.
 - **Core library:** Official Python MCP SDK, pinned to `mcp==2.3.0`; local stdio transport.
-- **Models:** None inside this server. The connected MCP host supplies its own model and tool-selection behavior.
+- **Models:** None inside this server. The connected MCP host supplies its own model and tool-selection behavior. The optional manual client uses the official Google SDK and your own Gemini API key.
 - **External service:** Anonymous public HTTP MCP at `https://pulseblr-u9f1.vercel.app/api/mcp` in live mode.
 - **Dependencies:** Declared in `pyproject.toml`; exact runtime and test resolutions are in `requirements.lock` and `requirements-dev.lock`.
-- **Cost:** No API key or paid model API is required by this package. Your MCP host may charge for its own model use. The live service's future pricing, availability, and rate limits are outside this package's control.
+- **Cost:** No API key or paid model API is required by the MCP server. The optional Gemini client consumes the quota of your selected Google project/model. Your MCP host may also charge for its own model use. The live service's future pricing, availability, and rate limits are outside this package's control.
 
 ## Architecture & Data Flow
 
@@ -72,7 +72,7 @@ Use returned event IDs when referring to “those events.” `event_ids` accepts
 - Internet access to install dependencies and to use live mode. Sample mode needs no network after installation.
 - An MCP host with local stdio-server support for conversational use.
 
-No PulseBLR account, API key, database, browser session, Node.js installation, or `uv` installation is required.
+No PulseBLR account, API key, database, browser session, Node.js installation, or `uv` installation is required for the server. The optional Gemini API client additionally requires its locked extra dependencies and a Gemini API key.
 
 ## Installation & Setup
 
@@ -111,15 +111,16 @@ These commands use the virtual environment directly. Shell activation and PowerS
 
 ## Configuration & Environment Variables
 
-This package does not require or automatically load environment variables or `.env` files. `.env.example` documents that choice and contains no credentials. There is no need to copy it to `.env`.
+The MCP server does not require credentials or load `.env` files. The optional Gemini client reads only a file you explicitly name with `--env-file`, or `GEMINI_API_KEY` from its own process environment. It does not pass the key to the MCP subprocess.
 
 | Setting | Required | Default | Description |
 | --- | --- | --- | --- |
 | `--source live` or `--source sample` | No | `live` | Select public live data or fictional offline data |
 | `--now <ISO timestamp>` | No | System clock | Sample-only fixed clock; live mode rejects it |
-| Environment variables | No | N/A | No application configuration or credentials are loaded from the environment |
+| `GEMINI_API_KEY` | Gemini client only | None | Put this in a Git-ignored `.env.local` and explicitly pass `--env-file .env.local`, or set it in the client process environment |
+| `GEMINI_MODEL` | No | `gemini-3.5-flash-lite` | Optional model ID in the named client settings file; `--model` overrides it |
 
-The live endpoint is fixed. The server does not accept arbitrary URLs, cookies, bearer tokens, or personal PulseBLR tool access.
+The live endpoint is fixed. The server does not accept arbitrary URLs, cookies, bearer tokens, or personal PulseBLR tool access. Never put a real API key in `.env.example`, this README, a host's committed configuration, a prompt, or a Git-tracked file.
 
 ## How to Run
 
@@ -172,7 +173,54 @@ Configure the host with these values after replacing the generic executable path
 
 After connecting, inspect the host's available tools: `search_events`, `get_event`, `list_topics`, `recommend_communities`, and `plan_schedule` must all appear. Then run the sample flow below. Model quality and a host's permissions affect tool use; neither changes the package's five-tool implementation.
 
-### Optional Google/Gemini host
+### Manual Gemini API test: exact key location and commands
+
+Run from `tools/pulseblr-events-mcp/` after the base installation above. Obtain a key from [Google AI Studio](https://aistudio.google.com/apikey). Use the optional locked dependencies and reinstall the package so the manual client is available:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-gemini.lock
+.\.venv\Scripts\python.exe -m pip install --no-deps .
+if (-not (Test-Path .env.local)) { Copy-Item .env.example .env.local }
+```
+
+On macOS/Linux, use `.venv/bin/python` for the two pip commands and `test -f .env.local || cp .env.example .env.local` to create the local file without overwriting an existing key.
+
+Open **`tools/pulseblr-events-mcp/.env.local`**, relative to the repository root. Add the key there after the equals sign:
+
+```dotenv
+GEMINI_API_KEY=YOUR_LOCAL_KEY
+GEMINI_MODEL=gemini-3.5-flash-lite
+```
+
+`YOUR_LOCAL_KEY` is a placeholder to replace locally. `.env.local` is ignored by Git and excluded from built distributions. `.env.example` must keep its committed key value empty. The server requires no key; only this manual client reads the named file.
+
+Start the interactive client on Windows:
+
+```powershell
+.\.venv\Scripts\python.exe -m pulseblr_events_mcp.gemini_client --env-file .env.local --source sample
+```
+
+On macOS/Linux:
+
+```bash
+.venv/bin/python -m pulseblr_events_mcp.gemini_client --env-file .env.local --source sample
+```
+
+Type the three example prompts below. The terminal shows which MCP tools Gemini calls, followed by its answer. Sample mode uses the fixed demo clock and fictional events. Type `exit` to finish. Change `--source sample` to `--source live` for real public listings; the key location stays the same.
+
+For a single all-five-tools check:
+
+```powershell
+.\.venv\Scripts\python.exe -m pulseblr_events_mcp.gemini_client --env-file .env.local --source sample --verify-all-tools --prompt "Discover topics, find events this weekend, read an event's details, recommend relevant organisers, and plan two events with 60 minutes between physical venues."
+```
+
+The client reports success only if all five tools were actually called successfully. Its loop is bounded to six model rounds and ten tool calls per user prompt. Automatic SDK tool execution, automatic continuation, and automatic retries are disabled. This prevents a successful-looking response from hiding an unbounded agent loop.
+
+The documented default `gemini-3.5-flash-lite` and override `--model gemini-3.8-flash` support function calling and are listed with free-tier Standard input/output pricing in [Google's pricing documentation](https://ai.google.dev/gemini-api/docs/pricing). Project eligibility, billing configuration, quotas, model access and service availability still apply. No Search or Maps grounding is used by this client. If a model returns a gateway timeout, select another available model explicitly; the client does not silently change providers or models.
+
+The client sends your public prompts and public MCP results to Google. It keeps only bounded in-memory conversation context and writes no chat transcript. Use public event questions; do not include private work material or credentials. Key values are hidden from logs and output and are not available to the MCP server.
+
+### Optional Google/Gemini host without this API client
 
 For a Google-hosted model, follow the current official [Antigravity CLI quickstart](https://antigravity.google/docs/getting-started/) and [authentication guide](https://antigravity.google/docs/install/), choosing the **Antigravity CLI** tab. Its executable is `agy`. The user completes personal Google sign-in in the browser; OAuth credentials remain in the host's secure local credential storage, outside this project. This package needs no Google API key or Google model SDK.
 
@@ -258,7 +306,11 @@ The complete result also contains a fictional-data notice and a warning explaini
 
 ## How to Test
 
+For the timed review, use [the two-minute script and live scenario commands](docs/REVIEW_DEMO.md). [The saved live MCP report](docs/review_results.json) contains ten real scenarios, while [Gemini verification](docs/GEMINI_VERIFICATION.md) separately records successful model-selected calls to all five tools in live and sample modes.
+
 Install the locked test dependencies and run the suite from this project directory.
+
+For the full optional Gemini SDK test coverage, also install `requirements-gemini.lock`. The automated tests use fake model responses and local transports; they do not read `.env.local` or call Google's inference API. Actual model calls happen only when you explicitly run the manual client.
 
 Windows:
 
@@ -311,7 +363,9 @@ Use the virtual environment's Python executable in those commands, as shown in t
 
 **Verification status (24 October 2026):**
 
-- Windows, Python **3.12.13**: **123 tests passed**, plus four subtests; Ruff lint and formatting checks passed. Real stdio sample and live sessions exercised all five tools, no-match output and invalid-argument handling.
+- Windows, Python **3.12.13**, with the optional Gemini dependencies installed: **154 tests passed**, plus four subtests; Ruff lint and formatting checks passed. Real stdio sample and live sessions exercised all five tools, no-match output and invalid-argument handling.
+- Ten real live MCP scenarios passed, with a dated public-data snapshot in `docs/review_results.json`. The same ten-scenario harness passed with fictional offline data, including exact physical and online transfer boundaries.
+- Actual `gemini-3.5-flash-lite` API sessions called all five tools successfully in both live and sample modes. The terminal verified five successful calls in each run; no credential value was printed or passed to the MCP server. These model checks are separate from the deterministic test suite.
 - A fresh Windows **Python 3.11.15** virtual environment outside the checkout installed the runtime lock with pip, then the built wheel with `--no-deps`. With `PYTHONPATH` removed, imports resolved from its `site-packages`. The copied verification client called all five tools successfully from that external directory.
 - The installed wheel contained all 12 fictional sample events. Offline source checks passed with socket connection and DNS functions blocked. A portable `py3-none-any` wheel and source archive were built and checked for forbidden files and common credential patterns; no matches were found.
 - macOS/Linux instructions are provided, but those operating systems were **not executed** in this validation. No claim is made that every model or host UI was exercised; the shared MCP protocol surface was verified directly.
@@ -330,8 +384,8 @@ Use the virtual environment's Python executable in those commands, as shown in t
 
 ## Security & Privacy Considerations
 
-- **Secrets handling:** No API key, token, cookie, private environment file, or service-account credential is needed or loaded. The adapted `.gitignore` excludes local environments and common secret-file patterns. Ignoring a file does not remove a secret already tracked in Git; review staged changes before sharing.
-- **Data privacy:** In live mode, the public discovery filters or event IDs needed for a request are sent to the fixed PulseBLR endpoint. Sample mode reads packaged data locally and needs no network at runtime. The MCP host separately controls what it sends to its model provider.
+- **Secrets handling:** The MCP server needs and loads no API key, token, cookie, private environment file, or service-account credential. The optional Gemini client reads only its explicitly selected local key source, sends the key only to Google's API for authentication, and does not forward it to the MCP server or model prompt. The adapted `.gitignore` excludes local environments and common secret-file patterns. Ignoring a file does not remove a secret already tracked in Git; review staged changes before sharing.
+- **Data privacy:** In live mode, the public discovery filters or event IDs needed for a request are sent to the fixed PulseBLR endpoint. Sample mode reads packaged data locally and needs no network at runtime. The optional Gemini client still needs network/model access in either data mode; its public prompts and tool results are sent to Google. Other MCP hosts separately control what they send to their model provider.
 - **Public-only boundary:** The adapter uses an explicit public-operation allowlist and validated public event fields. It does not expose an arbitrary upstream executor, arbitrary URL fetching, private tools, or database access.
 - **Untrusted content:** Event titles, descriptions, organiser names, and links are external data. They may contain misleading text or prompt-injection attempts. The host must treat them as evidence, never instructions. Text bounds and field allowlists reduce exposure but cannot guarantee prompt-injection resistance.
 - **Execution:** The server computes filtering, grouping, and scheduling. It does not run event-supplied code or shell commands, submit forms, or write to calendars. Do not put credentials or private work details into public search queries.
